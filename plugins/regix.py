@@ -404,3 +404,4 @@ async def status_msg(bot, msg):
 async def close(bot, update):
     await update.answer()
     await update.message.delete()
+        
