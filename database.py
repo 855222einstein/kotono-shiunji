@@ -120,18 +120,40 @@ class Database:
         return default 
        
     async def add_bot(self, datas):
-       if not await self.is_bot_exist(datas['user_id']):
-          await self.bot.insert_one(datas)
-    
-    async def remove_bot(self, user_id):
-       await self.bot.delete_many({'user_id': int(user_id)})
-      
-    async def get_bot(self, user_id: int):
-       bot = await self.bot.find_one({'user_id': user_id})
+       # datas['is_bot'] = True -> a Bot (token based), False -> a Userbot (session based)
+       # A user can have ONE bot AND ONE userbot at the same time (different is_bot value).
+       # Re-adding the same type simply replaces the old one.
+       await self.bot.update_one(
+          {'user_id': datas['user_id'], 'is_bot': datas['is_bot']},
+          {'$set': datas},
+          upsert=True
+       )
+
+    async def remove_bot(self, user_id, is_bot=None):
+       query = {'user_id': int(user_id)}
+       if is_bot is not None:
+          query['is_bot'] = is_bot
+       await self.bot.delete_many(query)
+
+    async def get_bot(self, user_id: int, is_bot=None):
+       query = {'user_id': user_id}
+       if is_bot is not None:
+          query['is_bot'] = is_bot
+       bot = await self.bot.find_one(query)
        return bot if bot else None
-                                          
-    async def is_bot_exist(self, user_id):
-       bot = await self.bot.find_one({'user_id': user_id})
+
+    async def get_all_bots(self, user_id: int):
+       # returns dict: {'bot': <doc or None>, 'userbot': <doc or None>}
+       return {
+          'bot': await self.get_bot(user_id, is_bot=True),
+          'userbot': await self.get_bot(user_id, is_bot=False)
+       }
+
+    async def is_bot_exist(self, user_id, is_bot=None):
+       query = {'user_id': user_id}
+       if is_bot is not None:
+          query['is_bot'] = is_bot
+       bot = await self.bot.find_one(query)
        return bool(bot)
                                           
     async def in_channel(self, user_id: int, chat_id: int) -> bool:
