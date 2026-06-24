@@ -12,9 +12,11 @@ class STS:
     def verify(self):
         return self.data.get(self.id)
     
-    def store(self, From, to,  skip, limit, continuous=False):
+    def store(self, From, to,  skip, limit, continuous=False, client_type=None):
+        # client_type: True -> force use Bot, False -> force use Userbot, None -> old default behaviour
         self.data[self.id] = {"FROM": From, 'TO': to, 'total_files': 0, 'skip': skip, 'limit': limit,
-                      'fetched': skip, 'filtered': 0, 'deleted': 0, 'duplicate': 0, 'total': limit, 'start': 0, 'continuous': continuous}
+                      'fetched': skip, 'filtered': 0, 'deleted': 0, 'duplicate': 0, 'total': limit, 'start': 0,
+                      'continuous': continuous, 'client_type': client_type}
         self.get(full=True)
         return STS(self.id)
         
@@ -36,7 +38,8 @@ class STS:
        return int(no) / by 
     
     async def get_data(self, user_id):
-        bot = await db.get_bot(user_id)
+        client_type = getattr(self, 'client_type', None)
+        bot = await db.get_bot(user_id, is_bot=client_type) if client_type is not None else await db.get_bot(user_id)
         k, filters = self, await db.get_filters(user_id)
         size, configs = None, await db.get_configs(user_id)
         if configs['duplicate']:
