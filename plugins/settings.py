@@ -27,20 +27,25 @@ async def settings_query(bot, query):
        reply_markup=main_buttons())
        
   elif type=="bots":
-     buttons = [] 
-     _bot = await db.get_bot(user_id)
+     buttons = []
+     _bot = await db.get_bot(user_id, is_bot=True)
+     _userbot = await db.get_bot(user_id, is_bot=False)
      if _bot is not None:
-        buttons.append([InlineKeyboardButton(_bot['name'],
-                         callback_data=f"settings#editbot")])
+        buttons.append([InlineKeyboardButton(f"🤖 {_bot['name']}",
+                         callback_data=f"settings#editbot_bot")])
      else:
-        buttons.append([InlineKeyboardButton('✚ Add bot ✚', 
+        buttons.append([InlineKeyboardButton('✚ Add Bot ✚',
                          callback_data="settings#addbot")])
-        buttons.append([InlineKeyboardButton('✚ Add User bot ✚', 
+     if _userbot is not None:
+        buttons.append([InlineKeyboardButton(f"🙋 {_userbot['name']}",
+                         callback_data=f"settings#editbot_userbot")])
+     else:
+        buttons.append([InlineKeyboardButton('✚ Add User bot ✚',
                          callback_data="settings#adduserbot")])
      buttons.append([InlineKeyboardButton('↩ Back', 
                       callback_data="settings#main")])
      await query.message.edit_text(
-       "<b><u>My Bots</b></u>\n\n<b>You can manage your bots in here</b>",
+       "<b><u>My Bots</b></u>\n\n<b>Bot is used for public channels.\nUserbot is used for private channels.\nYou can add both at the same time.</b>",
        reply_markup=InlineKeyboardMarkup(buttons))
   
   elif type=="addbot":
@@ -99,18 +104,25 @@ async def settings_query(bot, query):
      except asyncio.exceptions.TimeoutError:
          await text.edit_text('Process has been automatically cancelled', reply_markup=InlineKeyboardMarkup(buttons))
   
-  elif type=="editbot": 
-     bot = await db.get_bot(user_id)
+  elif type.startswith("editbot"):
+     # type is "editbot_bot" or "editbot_userbot"
+     suffix = type.split('_', 1)[1] if '_' in type else 'bot'
+     is_bot = True if suffix == 'bot' else False
+     bot = await db.get_bot(user_id, is_bot=is_bot)
      TEXT = Translation.BOT_DETAILS if bot['is_bot'] else Translation.USER_DETAILS
-     buttons = [[InlineKeyboardButton('❌ Remove ❌', callback_data=f"settings#removebot")
+     buttons = [[InlineKeyboardButton('❌ Remove ❌', callback_data=f"settings#removebot_{suffix}")
                ],
                [InlineKeyboardButton('↩ Back', callback_data="settings#bots")]]
      await query.message.edit_text(
         TEXT.format(bot['name'], bot['id'], bot['username']),
         reply_markup=InlineKeyboardMarkup(buttons))
-                                             
-  elif type=="removebot":
-     await db.remove_bot(user_id)
+
+  elif type.startswith("removebot"):
+     # type is "removebot_bot" or "removebot_userbot"
+     suffix = type.split('_', 1)[1] if '_' in type else 'bot'
+     is_bot = True if suffix == 'bot' else False
+     await db.remove_bot(user_id, is_bot=is_bot)
+     buttons = [[InlineKeyboardButton('↩ Back', callback_data="settings#bots")]]
      await query.message.edit_text(
         "<b>successfully updated</b>",
         reply_markup=InlineKeyboardMarkup(buttons))
@@ -447,5 +459,19 @@ def extract_btn(datas):
 
 def size_button(size):
   buttons = [[
+       InlineKeyboardButton('-',
+                    callback_data=f'settings#update_size-{max(size-10, 0)}'),
+       InlineKeyboardButton(f'{size} MB',
+                    callback_data='settings#alert_size limit'),
        InlineKeyboardButton('+',
-                    callback_data=f'settings#u
+                    callback_data=f'settings#update_size-{size+10}')
+       ],[
+       InlineKeyboardButton('more than',
+                    callback_data=f'settings#update_limit-True-{size}'),
+       InlineKeyboardButton('less than',
+                    callback_data=f'settings#update_limit-False-{size}')
+       ],[
+       InlineKeyboardButton('↩ Back',
+                    callback_data='settings#main')
+       ]]
+  return InlineKeyboardMarkup(buttons)
